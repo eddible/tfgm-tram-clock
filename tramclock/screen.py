@@ -189,9 +189,9 @@ class Renderer:
                 wait_surf = self.dot(46).render(wait, False, self.colour)
                 surf.blit(wait_surf, (440 - wait_surf.get_width() + dx, y))
                 cars = 2 if dep.carriages == "Double" else 1
-                self._carriages(surf, 34 + dx, y + 14, cars, dim)
-                dest = self._fit(SHORT_NAMES.get(dep.dest, dep.dest), 440 - wait_surf.get_width() - 24 - 58)
-                surf.blit(dest, (58 + dx, y))
+                self._carriages(surf, 42 + dx, y + 14, cars, dim)
+                dest = self._fit(SHORT_NAMES.get(dep.dest, dep.dest), 440 - wait_surf.get_width() - 24 - 64)
+                surf.blit(dest, (64 + dx, y))
         else:
             if board is not None:
                 msg = "No trams due"
@@ -215,9 +215,9 @@ class Renderer:
         if state.get("remaining") is not None and state.get("total"):
             frac = max(0.0, min(1.0, state["remaining"] / float(state["total"])))
             if frac > 0:
-                rect = pygame.Rect(14, 14, SIZE - 28, SIZE - 28)
+                rect = pygame.Rect(5, 5, SIZE - 10, SIZE - 10)
                 start = math.pi / 2
-                pygame.draw.arc(surf, dim, rect, start, start + frac * 2 * math.pi, 6)
+                pygame.draw.arc(surf, dim, rect, start, start + frac * 2 * math.pi, 4)
 
         return surf
 
