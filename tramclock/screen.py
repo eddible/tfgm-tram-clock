@@ -6,6 +6,7 @@ import logging
 import math
 import mmap
 import os
+import struct
 import threading
 import time
 
@@ -19,6 +20,7 @@ CENTRE = SIZE // 2
 ASSETS = os.path.join(os.path.dirname(__file__), "assets")
 BACKLIGHT = "/sys/class/backlight/rpi_backlight/brightness"
 KDSETMODE, KD_TEXT, KD_GRAPHICS = 0x4B3A, 0, 1
+FBIO_WAITFORVSYNC = 0x40044620
 FB_MASKS = {32: (0xFF0000, 0x00FF00, 0x0000FF), 16: (0xF800, 0x07E0, 0x001F)}
 
 # Nudge everything by a pixel or two every few minutes so no pixel holds
@@ -30,7 +32,7 @@ ORBIT_SECONDS = 120
 SECONDARY = 0.85
 
 TICKER_TOP, TICKER_HEIGHT = 338, 40
-TICKER_SPEED = 60  # px per second
+TICKER_STEP = 2  # px per frame; at 30 fps that's 60 px/s
 TICKER_LEFT, TICKER_RIGHT = 60, 420  # visible chord of the circle at ticker height
 
 # Shorter names so destinations fit at a readable size.
@@ -69,6 +71,17 @@ class Panel:
         except OSError as e:
             log.warning("Could not put %s into graphics mode: %s", tty, e)
         self.backlight = None
+        self._vsync = True
+
+    def wait_vsync(self):
+        """Block until the next vertical blank, so writes don't tear mid-scan."""
+        if not self._vsync:
+            return
+        try:
+            fcntl.ioctl(self._fb, FBIO_WAITFORVSYNC, struct.pack("I", 0))
+        except OSError as e:
+            log.warning("vsync unavailable, updates may tear: %s", e)
+            self._vsync = False
 
     def set_backlight(self, on):
         if on == self.backlight:
@@ -96,6 +109,9 @@ class Panel:
         row = surface.get_width() * self.bpp // 8
         if pitch != row:
             data = b"".join(data[y * pitch:y * pitch + row] for y in range(surface.get_height()))
+        # Copying takes well under a scan-out, so starting at vblank keeps
+        # us ahead of the beam.
+        self.wait_vsync()
         if row == self.stride:
             self._mem[top * self.stride:top * self.stride + len(data)] = data
         else:
@@ -135,6 +151,7 @@ class Renderer:
         self.colour = _hex("#FFB000")
         self._ticker_text = None
         self._ticker_surface = None
+        self._ticker_pos = 0
 
     def dot(self, size):
         if size not in self._dot_cache:
@@ -242,6 +259,7 @@ class Renderer:
         if text == self._ticker_text:
             return
         self._ticker_text = text
+        self._ticker_pos = 0
         self._ticker_surface = (
             self.small.render(text, True, self.colour) if text else None
         )
@@ -250,14 +268,20 @@ class Renderer:
     def has_ticker(self):
         return self._ticker_surface is not None
 
-    def draw_ticker(self, target, now):
-        """Draw the ticker onto target at time `now`, touching only its own strip."""
+    def draw_ticker(self, target, advance=False):
+        """Draw the ticker onto target, touching only its own strip.
+
+        Advances by a fixed step per frame (not by wall time) so the motion
+        stays even even when a frame is late.
+        """
         if not self._ticker_surface:
             return
         target.set_clip(pygame.Rect(TICKER_LEFT, TICKER_TOP, TICKER_RIGHT - TICKER_LEFT, TICKER_HEIGHT))
         target.fill((0, 0, 0))
         lap = self._ticker_surface.get_width() + TICKER_RIGHT - TICKER_LEFT
-        x = TICKER_RIGHT - int(now * TICKER_SPEED) % lap
+        if advance:
+            self._ticker_pos = (self._ticker_pos + TICKER_STEP) % lap
+        x = TICKER_RIGHT - self._ticker_pos
         target.blit(self._ticker_surface, (x, TICKER_TOP + (TICKER_HEIGHT - self._ticker_surface.get_height()) // 2))
         target.set_clip(None)
 
@@ -274,18 +298,25 @@ class Screen:
 
     def draw(self, state, now):
         surf = self.renderer.frame(state, now)
-        self.renderer.draw_ticker(surf, now)
+        self.renderer.draw_ticker(surf)
         with self._lock:
             self._frame = surf
         if self.panel:
             self.panel.show(surf)
 
-    def draw_ticker(self, now):
+    def draw_ticker(self):
         with self._lock:
-            self.renderer.draw_ticker(self._frame, now)
+            self.renderer.draw_ticker(self._frame, advance=True)
             band = self._frame.subsurface((0, TICKER_TOP, SIZE, TICKER_HEIGHT)).copy()
         if self.panel:
             self.panel.show(band, TICKER_TOP)
+
+    def skip_frame(self):
+        """Let one vblank pass, so ticker frames land on every second one (30 fps)."""
+        if self.panel:
+            self.panel.wait_vsync()
+        else:
+            time.sleep(1 / 60.0)
 
     def blank(self):
         if self.panel:

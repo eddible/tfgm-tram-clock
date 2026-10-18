@@ -14,7 +14,6 @@ from . import web
 
 log = logging.getLogger("tramclock")
 
-TICKER_FPS = 20
 
 
 class RingHandler(logging.Handler):
@@ -92,9 +91,15 @@ def display_loop(controller, screen, stop):
                 last_key = key
                 screen.set_backlight(True)  # after the first frame is up
             elif screen.renderer.has_ticker:
-                screen.draw_ticker(now)
+                screen.draw_ticker()
 
-            controller.wait_for_change(1.0 / TICKER_FPS if screen.renderer.has_ticker else 1.0)
+            if screen.renderer.has_ticker:
+                # Panel is 60 Hz: skip one vblank here, and show() waits for
+                # the next, so the ticker moves an even 2 px every 33 ms.
+                screen.skip_frame()
+                controller.wait_for_change(0)
+            else:
+                controller.wait_for_change(1.0)
         else:
             controller.wait_for_change(5.0)
 
