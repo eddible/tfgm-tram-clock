@@ -154,8 +154,10 @@ class Renderer:
         return self._dot_cache[size]
 
     def set_colour(self, colour):
-        self.colour = _hex(colour)
-        self._ticker_text = None
+        rgb = _hex(colour)
+        if rgb != self.colour:
+            self.colour = rgb
+            self._ticker_text = None  # re-render the ticker in the new colour
 
     # -- helpers -----------------------------------------------------------
 
