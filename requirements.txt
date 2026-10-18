@@ -1,0 +1,5 @@
+pygame==2.1.2
+requests==2.27.1
+hyperpixel2r==0.0.1
+smbus2==0.4.2
+RPi.GPIO==0.7.0

@@ -5,14 +5,20 @@ set -e
 cd "$(dirname "$0")"
 DIR=$(pwd)
 
+if ! python3 -c "import pygame, requests, hyperpixel2r" 2>/dev/null; then
+    echo "Installing Python dependencies"
+    command -v pip3 >/dev/null || sudo apt-get install -y python3-pip
+    sudo pip3 install -r requirements.txt
+fi
+
 if [ ! -f config.json ]; then
     echo "Creating config.json"
     python3 - <<'EOF'
 import configparser, json, os
 cfg = {"views": []}
 old = configparser.ConfigParser()
-# Carry settings over from the original tfgm-tram-clock config if present.
-old.read(os.path.expanduser("~pi/tfgm-tram-clock/config.ini"))
+# Carry settings over from the original version's config.ini if present.
+old.read(["config.ini", os.path.expanduser("~pi/tfgm-tram-clock/config.ini")])
 if "TFGM-CONFIG" in old:
     sec = old["TFGM-CONFIG"]
     cfg["api_key"] = sec.get("api_key", "").strip()
@@ -23,7 +29,6 @@ if "TFGM-CONFIG" in old:
 with open("config.json", "w") as f:
     json.dump(cfg, f, indent=2)
 EOF
-    chown pi:pi config.json
     chmod 600 config.json
 fi
 
