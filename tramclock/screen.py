@@ -35,7 +35,9 @@ ERROR_COLOUR = (255, 0, 0)
 # not brightness. Dots rather than a line: a thin circle without
 # anti-aliasing looks jagged, and dots match the dot-matrix font.
 RING_RADIUS = 231
-DOT_SMALL, DOT_MARK, DOT_LEAD, DOT_HOUR = 2, 4, 3, 7
+DOT_SMALL, DOT_MARK, DOT_LEAD = 2, 3, 3
+# The hour hand is a stubby rounded bar pointing in from the ring.
+HAND_OUTER, HAND_INNER, HAND_WIDTH = 236, 212, 5
 
 TICKER_TOP, TICKER_HEIGHT = 338, 40
 TICKER_STEP = 2  # px per frame; at 30 fps that's 60 px/s
@@ -193,22 +195,27 @@ class Renderer:
             pygame.draw.rect(target, colour, (x + i * 8, top, 5, height))
 
     @staticmethod
-    def _dot(target, colour, minute, size, dx, dy):
+    def _dot(target, colour, minute, size, dx, dy, radius=RING_RADIUS):
         """Dot at `minute` (0-60, may be fractional) clockwise from 12 o'clock."""
         a = 2 * math.pi * minute / 60.0
-        centre = (round(CENTRE + dx + RING_RADIUS * math.sin(a)), round(CENTRE + dy - RING_RADIUS * math.cos(a)))
+        centre = (round(CENTRE + dx + radius * math.sin(a)), round(CENTRE + dy - radius * math.cos(a)))
         pygame.draw.circle(target, colour, centre, size)
 
+    def _hand(self, target, minute, dx, dy):
+        # A run of overlapping circles gives a rounded bar with no thin
+        # diagonal edges, which this panel renders badly.
+        for r in range(HAND_INNER, HAND_OUTER + 1, 2):
+            self._dot(target, self.colour, minute, HAND_WIDTH, dx, dy, radius=r)
+
     def _ring_clock(self, target, now, dx, dy):
-        """Analogue clock: hour markers, minutes filling clockwise, a big hour dot."""
+        """Analogue clock: hour markers, minutes filling clockwise, an hour hand."""
         t = time.localtime(now)
         for m in range(1, t.tm_min + 1):
             if m % 5:
                 self._dot(target, self.colour, m, DOT_LEAD if m == t.tm_min else DOT_SMALL, dx, dy)
         for m in range(0, 60, 5):
             self._dot(target, self.colour, m, DOT_MARK, dx, dy)
-        hour = (t.tm_hour % 12 + t.tm_min / 60.0) * 5
-        self._dot(target, self.colour, hour, DOT_HOUR, dx, dy)
+        self._hand(target, (t.tm_hour % 12 + t.tm_min / 60.0) * 5, dx, dy)
 
     def _ring_next_tram(self, target, board, dx, dy):
         """One big dot per minute until the next tram, over small 5-minute ticks."""
@@ -227,7 +234,7 @@ class Renderer:
         surf = pygame.Surface((SIZE, SIZE))
         surf.fill((0, 0, 0))
         clock = self._text(time.strftime("%H:%M", time.localtime(now)), 40)
-        self._centred(clock, surf, 30 + dy, dx)
+        self._centred(clock, surf, 34 + dy, dx)
         self._centred(self._fit(state["view_name"].upper(), 340, (30, 26, 22)), surf, 80 + dy, dx)
         pygame.draw.line(surf, self.colour, (70 + dx, 122 + dy), (410 + dx, 122 + dy), 2)
 
