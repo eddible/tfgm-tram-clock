@@ -26,6 +26,9 @@ FB_MASKS = {32: (0xFF0000, 0x00FF00, 0x0000FF), 16: (0xF800, 0x07E0, 0x001F)}
 ORBIT = [(0, 0), (2, 1), (1, -2), (-2, -1), (-1, 2)]
 ORBIT_SECONDS = 120
 
+# The panel crushes dark shades, so "dim" text must stay fairly bright to be visible.
+SECONDARY = 0.85
+
 TICKER_TOP, TICKER_HEIGHT = 338, 40
 TICKER_SPEED = 60  # px per second
 TICKER_LEFT, TICKER_RIGHT = 52, 428  # visible chord of the circle at ticker height
@@ -127,7 +130,7 @@ class Renderer:
         dot = os.path.join(ASSETS, "train-font.ttf")
         self._dot_cache = {}
         self._dot_path = dot
-        self.small = pygame.font.Font(os.path.join(ASSETS, "RobotoCondensed-Regular.ttf"), 24)
+        self.small = pygame.font.Font(os.path.join(ASSETS, "RobotoCondensed-Bold.ttf"), 26)
         self.clock = pygame.font.Font(os.path.join(ASSETS, "RobotoCondensed-Bold.ttf"), 38)
         self.colour = _hex("#FFB000")
         self._ticker_text = None
@@ -171,12 +174,12 @@ class Renderer:
         dx, dy = ORBIT[int(now // ORBIT_SECONDS) % len(ORBIT)]
         surf = pygame.Surface((SIZE, SIZE))
         surf.fill((0, 0, 0))
-        dim = _dim(self.colour, 0.55)
+        dim = _dim(self.colour, SECONDARY)
 
         clock = self.clock.render(time.strftime("%H:%M", time.localtime(now)), True, dim)
         self._centred(clock, surf, 30 + dy, dx)
         self._centred(self._fit(state["view_name"].upper(), 340, (30, 26, 22)), surf, 80 + dy, dx)
-        pygame.draw.line(surf, _dim(self.colour, 0.3), (70 + dx, 122 + dy), (410 + dx, 122 + dy), 2)
+        pygame.draw.line(surf, _dim(self.colour, 0.6), (70 + dx, 122 + dy), (410 + dx, 122 + dy), 2)
 
         board = state.get("board")
         if board and board.departures:
@@ -207,14 +210,14 @@ class Renderer:
         elif state.get("remaining") is not None:
             mins = int(math.ceil(state["remaining"] / 60.0))
             label = "screen off in {} min".format(mins) if not state.get("scheduled") else "scheduled"
-            self._centred(self.small.render(label, True, _dim(self.colour, 0.4)), surf, 400 + dy, dx)
+            self._centred(self.small.render(label, True, _dim(self.colour, SECONDARY)), surf, 400 + dy, dx)
 
         if state.get("remaining") is not None and state.get("total"):
             frac = max(0.0, min(1.0, state["remaining"] / float(state["total"])))
             if frac > 0:
-                rect = pygame.Rect(10, 10, SIZE - 20, SIZE - 20)
+                rect = pygame.Rect(14, 14, SIZE - 28, SIZE - 28)
                 start = math.pi / 2
-                pygame.draw.arc(surf, _dim(self.colour, 0.45), rect, start, start + frac * 2 * math.pi, 4)
+                pygame.draw.arc(surf, dim, rect, start, start + frac * 2 * math.pi, 6)
 
         return surf
 
@@ -226,7 +229,7 @@ class Renderer:
             return
         self._ticker_text = text
         self._ticker_surface = (
-            self.small.render(text, True, _dim(self.colour, 0.8)) if text else None
+            self.small.render(text, True, self.colour) if text else None
         )
 
     @property
