@@ -166,6 +166,22 @@ class Renderer:
         for i in range(count):
             pygame.draw.rect(target, colour, (x + i * 9, y, 6, 18))
 
+    @staticmethod
+    def _ring(target, colour, frac, outer, width):
+        """Ring from 12 o'clock clockwise covering `frac` of the circle.
+
+        Drawn as a filled polygon: pygame.draw.arc leaves gaps at the seam.
+        """
+        if frac >= 0.999:
+            pygame.draw.circle(target, colour, (CENTRE, CENTRE), outer, width)
+            return
+        steps = max(2, int(360 * frac))
+        angles = [2 * math.pi * frac * i / steps for i in range(steps + 1)]
+        inner = outer - width
+        points = [(CENTRE + outer * math.sin(a), CENTRE - outer * math.cos(a)) for a in angles]
+        points += [(CENTRE + inner * math.sin(a), CENTRE - inner * math.cos(a)) for a in reversed(angles)]
+        pygame.draw.polygon(target, colour, points)
+
     # -- frame -------------------------------------------------------------
 
     def frame(self, state, now=None):
@@ -215,9 +231,7 @@ class Renderer:
         if state.get("remaining") is not None and state.get("total"):
             frac = max(0.0, min(1.0, state["remaining"] / float(state["total"])))
             if frac > 0:
-                rect = pygame.Rect(5, 5, SIZE - 10, SIZE - 10)
-                start = math.pi / 2
-                pygame.draw.arc(surf, dim, rect, start, start + frac * 2 * math.pi, 4)
+                self._ring(surf, dim, frac, outer=235, width=4)
 
         return surf
 
