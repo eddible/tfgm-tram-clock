@@ -102,7 +102,8 @@ class Config:
         merged.update(new)
         cleaned = validate(merged)
         tmp = self.path + ".tmp"
-        with open(tmp, "w") as f:
+        # Owner-only: the file holds the API key.
+        with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
             json.dump(cleaned, f, indent=2)
             f.flush()
             os.fsync(f.fileno())
