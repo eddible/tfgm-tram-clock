@@ -74,7 +74,7 @@ def display_loop(controller, screen, stop):
 
         if awake:
             cfg = controller.cfg
-            screen.renderer.set_colour(cfg["colour"])
+            screen.renderer.set_colour(cfg["colour"], cfg["ring_colours"][:cfg["ring_trams"]])
             state = controller.display_state(now)
             board = state["board"]
             screen.renderer.set_ticker(
@@ -83,7 +83,7 @@ def display_loop(controller, screen, stop):
             remaining = state["remaining"]
             key = (
                 time.strftime("%H:%M", time.localtime(now)), int(now // 120),
-                state["view_name"], board, state["error"], state["stale"], cfg["colour"], cfg["ring"],
+                state["view_name"], board, state["error"], state["stale"], cfg["colour"], cfg["ring_colours"], cfg["ring_trams"], cfg["ring"],
                 None if remaining is None else int(remaining // 10),
             )
             if key != last_key:

@@ -137,11 +137,26 @@
       <label for="ring">Outer ring</label>
       <select id="ring">
         <option value="clock">Clock: hour dot and minutes filling round</option>
-        <option value="next_tram">Next tram: one dot per minute until it's due</option>
+        <option value="next_tram">Next tram: dots change colour, one per minute until it's due</option>
         <option value="off">Off</option>
       </select>
+      <div id="ring-tram-fields">
+        <label for="ring_trams">Trams shown on the ring</label>
+        <select id="ring_trams">
+          <option value="1">Next tram only</option>
+          <option value="2">Next 2 trams</option>
+          <option value="3">Next 3 trams</option>
+        </select>
+        <label>Ring colour for each tram</label>
+        <div class="row">
+          <input type="color" id="ring_colour_0" aria-label="1st tram colour" title="1st tram">
+          <input type="color" id="ring_colour_1" aria-label="2nd tram colour" title="2nd tram">
+          <input type="color" id="ring_colour_2" aria-label="3rd tram colour" title="3rd tram">
+        </div>
+      </div>
       <label for="colour">Text colour</label>
       <input type="color" id="colour">
+      <p class="muted" style="margin:6px 0 0">Pure colours like white, red, green or cyan look sharpest on this screen.</p>
       <label class="switch"><input type="checkbox" id="show_messages"> Scroll service messages along the bottom</label>
     </section>
 
@@ -291,13 +306,23 @@ function renderSchedule() {
 
 function fillForm() {
   for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key", "ring"]) $(k).value = cfg[k];
+  $("ring_trams").value = String(cfg.ring_trams);
+  cfg.ring_colours.forEach((c, i) => { $("ring_colour_" + i).value = c; });
+  showRingFields();
   $("show_messages").checked = cfg.show_messages;
   renderViews();
   renderSchedule();
 }
 
-for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key", "show_messages", "ring"])
+for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key", "show_messages", "ring", "ring_trams",
+                 "ring_colour_0", "ring_colour_1", "ring_colour_2"])
   $(k).addEventListener("input", markDirty);
+function showRingFields() {
+  $("ring-tram-fields").hidden = $("ring").value !== "next_tram";
+  for (let i = 0; i < 3; i++) $("ring_colour_" + i).hidden = i >= +$("ring_trams").value;
+}
+$("ring").addEventListener("input", showRingFields);
+$("ring_trams").addEventListener("input", showRingFields);
 
 $("add-window").onclick = () => {
   cfg.schedule.push({days: [0, 1, 2, 3, 4], start: "07:30", end: "08:30"});
@@ -312,6 +337,8 @@ $("settings").onsubmit = async (e) => {
     refresh_seconds: +$("refresh_seconds").value,
     colour: $("colour").value,
     ring: $("ring").value,
+    ring_trams: +$("ring_trams").value,
+    ring_colours: [0, 1, 2].map(i => $("ring_colour_" + i).value),
     show_messages: $("show_messages").checked,
     api_key: $("api_key").value,
   };

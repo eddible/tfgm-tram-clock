@@ -21,6 +21,11 @@ DEFAULTS = {
     # Outer ring: "clock" (analogue time), "next_tram" (minutes to the next
     # departure) or "off".
     "ring": "clock",
+    # Next-tram ring: how many trams it shows (1-3) and a colour for each.
+    # Stick to colours whose red, green and blue are each fully on or off:
+    # the panel bands on part-lit pixels.
+    "ring_trams": 1,
+    "ring_colours": ["#FFFFFF", "#00FFFF", "#00FF00"],
     # Windows when the screen stays on without a tap, e.g.
     # {"days": [0, 1, 2, 3, 4], "start": "07:30", "end": "08:30"}  (0 = Monday)
     "schedule": [],
@@ -54,7 +59,8 @@ def validate(cfg):
         views.append({"name": name[:40], "pids": pids})
     out["views"] = views
 
-    for key, lo, hi in (("wake_minutes", 1, 24 * 60), ("refresh_seconds", 10, 600), ("web_port", 1, 65535)):
+    for key, lo, hi in (("wake_minutes", 1, 24 * 60), ("refresh_seconds", 10, 600), ("web_port", 1, 65535),
+                        ("ring_trams", 1, 3)):
         try:
             out[key] = int(out[key])
         except (TypeError, ValueError):
@@ -64,6 +70,10 @@ def validate(cfg):
 
     if not _COLOUR_RE.match(str(out["colour"])):
         raise ConfigError("colour must look like #RRGGBB")
+    colours = [str(c) for c in out["ring_colours"]][:3]
+    if len(colours) != 3 or not all(_COLOUR_RE.match(c) for c in colours):
+        raise ConfigError("ring_colours must be three colours like #RRGGBB")
+    out["ring_colours"] = colours
     out["show_messages"] = bool(out["show_messages"])
     if out["ring"] not in RING_MODES:
         raise ConfigError("ring must be one of: " + ", ".join(RING_MODES))

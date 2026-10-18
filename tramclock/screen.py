@@ -35,7 +35,7 @@ ERROR_COLOUR = (255, 0, 0)
 # not brightness. Dots rather than a line: a thin circle without
 # anti-aliasing looks jagged, and dots match the dot-matrix font.
 RING_RADIUS = 231
-DOT_SMALL, DOT_MARK, DOT_LEAD = 2, 3, 3
+DOT_SMALL, DOT_MARK, DOT_LEAD, DOT_RING = 2, 3, 3, 3
 # The hour hand is a short rounded bar pointing in from the ring, with the
 # ring dots either side of it left out so it reads cleanly.
 HAND_OUTER, HAND_INNER, HAND_WIDTH = 234, 216, 3
@@ -152,6 +152,7 @@ class Renderer:
         self._dot_cache = {}
         self._dot_path = os.path.join(ASSETS, "train-font.ttf")
         self.colour = _hex("#FFB000")
+        self.ring_colours = [_hex("#FFFFFF")]
         self._ticker_text = None
         self._ticker_surface = None
         self._ticker_pos = 0
@@ -161,11 +162,13 @@ class Renderer:
             self._dot_cache[size] = pygame.font.Font(self._dot_path, size)
         return self._dot_cache[size]
 
-    def set_colour(self, colour):
+    def set_colour(self, colour, ring_colours=None):
         rgb = _hex(colour)
         if rgb != self.colour:
             self.colour = rgb
             self._ticker_text = None  # re-render the ticker in the new colour
+        if ring_colours:
+            self.ring_colours = [_hex(c) for c in ring_colours]
 
     # -- helpers -----------------------------------------------------------
 
@@ -227,12 +230,20 @@ class Renderer:
         self._hand(target, hand, dx, dy)
 
     def _ring_next_tram(self, target, board, dx, dy):
-        """One big dot per minute until the next tram, over small 5-minute ticks."""
-        wait = board.departures[0].wait if board and board.departures else 0
-        for m in range(0, 60, 5):
-            self._dot(target, self.colour, m, DOT_SMALL, dx, dy)
-        for m in range(min(wait, 60)):
-            self._dot(target, self.colour, m, DOT_MARK, dx, dy)
+        """A full ring of 60 dots, one per minute from now.
+
+        Dots up to the first tram's arrival take the first ring colour, then
+        up to the second tram's the second colour, and so on; the rest stay
+        in the text colour.
+        """
+        waits = [d.wait for d in board.departures] if board else []
+        for m in range(60):
+            colour = self.colour
+            for wait, highlight in zip(waits, self.ring_colours):
+                if m < wait:
+                    colour = highlight
+                    break
+            self._dot(target, colour, m, DOT_RING, dx, dy)
 
     # -- frame -------------------------------------------------------------
 
