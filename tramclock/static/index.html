@@ -138,6 +138,7 @@
       <select id="ring">
         <option value="clock">Clock: hour dot and minutes filling round</option>
         <option value="next_tram">Next tram: dots change colour, one per minute until it's due</option>
+        <option value="tram_charge">Next tram on the right, car charge on the left</option>
         <option value="off">Off</option>
       </select>
       <div id="ring-tram-fields">
@@ -154,6 +155,10 @@
           <input type="color" id="ring_colour_2" aria-label="3rd tram colour" title="3rd tram">
         </div>
       </div>
+      <div id="charge-colour-field">
+        <label for="charge_colour">Charge colour</label>
+        <input type="color" id="charge_colour">
+      </div>
       <label for="colour">Text colour</label>
       <input type="color" id="colour">
       <p class="muted" style="margin:6px 0 0">Pure colours like white, red, green or cyan look sharpest on this screen.</p>
@@ -165,6 +170,17 @@
       <p class="muted" style="margin-top:-6px">Times when the screen comes on by itself, like your morning commute.</p>
       <div id="schedule-list"></div>
       <button type="button" id="add-window">+ Add a time</button>
+    </section>
+
+    <section class="card" id="ha-card">
+      <h2>Home Assistant</h2>
+      <p class="muted" style="margin-top:-6px">For the car charge half of the ring. Create a long-lived access token on your Home Assistant profile page.</p>
+      <label for="ha_url">Address</label>
+      <input type="text" id="ha_url" placeholder="http://homeassistant.local:8123" inputmode="url">
+      <label for="ha_token">Long-lived access token</label>
+      <input type="password" id="ha_token">
+      <label for="ha_entity">Sensor</label>
+      <input type="text" id="ha_entity" placeholder="sensor.car_state_of_charge">
     </section>
 
     <section class="card">
@@ -247,6 +263,8 @@ function renderStatus() {
   }
   if (s.error) parts.push(el("p", {class: "error"}, s.error));
   if (s.age != null && s.departures) parts.push(el("p", {class: "muted"}, `Updated ${Math.round(s.age)}s ago`));
+  if (s.charge != null) parts.push(el("p", {class: "muted"}, `Car charge ${Math.round(s.charge)}%`));
+  if (s.charge_error) parts.push(el("p", {class: "error"}, s.charge_error));
   for (const m of s.messages || []) parts.push(el("div", {class: "msg"}, m));
   board.replaceChildren(...parts);
 }
@@ -305,7 +323,8 @@ function renderSchedule() {
 }
 
 function fillForm() {
-  for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key", "ring"]) $(k).value = cfg[k];
+  for (const k of ["wake_minutes", "refresh_seconds", "colour", "charge_colour", "api_key", "ring",
+                   "ha_url", "ha_token", "ha_entity"]) $(k).value = cfg[k];
   $("ring_trams").value = String(cfg.ring_trams);
   cfg.ring_colours.forEach((c, i) => { $("ring_colour_" + i).value = c; });
   showRingFields();
@@ -315,10 +334,12 @@ function fillForm() {
 }
 
 for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key", "show_messages", "ring", "ring_trams",
-                 "ring_colour_0", "ring_colour_1", "ring_colour_2"])
+                 "ring_colour_0", "ring_colour_1", "ring_colour_2", "charge_colour", "ha_url", "ha_token", "ha_entity"])
   $(k).addEventListener("input", markDirty);
 function showRingFields() {
-  $("ring-tram-fields").hidden = $("ring").value !== "next_tram";
+  const ring = $("ring").value;
+  $("ring-tram-fields").hidden = ring !== "next_tram" && ring !== "tram_charge";
+  $("charge-colour-field").hidden = $("ha-card").hidden = ring !== "tram_charge";
   for (let i = 0; i < 3; i++) $("ring_colour_" + i).hidden = i >= +$("ring_trams").value;
 }
 $("ring").addEventListener("input", showRingFields);
@@ -339,6 +360,10 @@ $("settings").onsubmit = async (e) => {
     ring: $("ring").value,
     ring_trams: +$("ring_trams").value,
     ring_colours: [0, 1, 2].map(i => $("ring_colour_" + i).value),
+    charge_colour: $("charge_colour").value,
+    ha_url: $("ha_url").value,
+    ha_token: $("ha_token").value,
+    ha_entity: $("ha_entity").value,
     show_messages: $("show_messages").checked,
     api_key: $("api_key").value,
   };

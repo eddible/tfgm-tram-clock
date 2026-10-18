@@ -74,7 +74,7 @@ def display_loop(controller, screen, stop):
 
         if awake:
             cfg = controller.cfg
-            screen.renderer.set_colour(cfg["colour"], cfg["ring_colours"][:cfg["ring_trams"]])
+            screen.renderer.set_colour(cfg["colour"], cfg["ring_colours"][:cfg["ring_trams"]], cfg["charge_colour"])
             state = controller.display_state(now)
             board = state["board"]
             screen.renderer.set_ticker(
@@ -84,6 +84,7 @@ def display_loop(controller, screen, stop):
             key = (
                 time.strftime("%H:%M", time.localtime(now)), int(now // 120),
                 state["view_name"], board, state["error"], state["stale"], cfg["colour"], cfg["ring_colours"], cfg["ring_trams"], cfg["ring"],
+                cfg["charge_colour"], state["charge"],
                 None if remaining is None else int(remaining // 10),
             )
             if key != last_key:
@@ -130,6 +131,7 @@ def main():
 
     web.serve(controller, screen, log_lines, args.port or config.get()["web_port"])
     threading.Thread(target=controller.fetcher, args=(stop,), name="fetcher", daemon=True).start()
+    threading.Thread(target=controller.charge_fetcher, args=(stop,), name="charge", daemon=True).start()
     touch = start_touch(controller)  # noqa: F841 (keep a reference)
 
     # Flash the clock up on boot so it's obvious it started.

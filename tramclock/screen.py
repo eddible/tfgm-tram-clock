@@ -153,6 +153,7 @@ class Renderer:
         self._dot_path = os.path.join(ASSETS, "train-font.ttf")
         self.colour = _hex("#FFB000")
         self.ring_colours = [_hex("#FFFFFF")]
+        self.charge_colour = _hex("#00FF00")
         self._ticker_text = None
         self._ticker_surface = None
         self._ticker_pos = 0
@@ -162,13 +163,15 @@ class Renderer:
             self._dot_cache[size] = pygame.font.Font(self._dot_path, size)
         return self._dot_cache[size]
 
-    def set_colour(self, colour, ring_colours=None):
+    def set_colour(self, colour, ring_colours=None, charge_colour=None):
         rgb = _hex(colour)
         if rgb != self.colour:
             self.colour = rgb
             self._ticker_text = None  # re-render the ticker in the new colour
         if ring_colours:
             self.ring_colours = [_hex(c) for c in ring_colours]
+        if charge_colour:
+            self.charge_colour = _hex(charge_colour)
 
     # -- helpers -----------------------------------------------------------
 
@@ -229,21 +232,30 @@ class Renderer:
                 self._dot(target, self.colour, m, DOT_MARK, dx, dy)
         self._hand(target, hand, dx, dy)
 
-    def _ring_next_tram(self, target, board, dx, dy):
-        """A full ring of 60 dots, one per minute from now.
+    def _ring_next_tram(self, target, board, dx, dy, span=60):
+        """Dots clockwise from 12 o'clock, one per minute from now.
 
         Dots up to the first tram's arrival take the first ring colour, then
         up to the second tram's the second colour, and so on; the rest stay
-        in the text colour.
+        in the text colour. `span` is how many dot positions (minutes) to use.
         """
         waits = [d.wait for d in board.departures] if board else []
-        for m in range(60):
+        for m in range(span):
             colour = self.colour
             for wait, highlight in zip(waits, self.ring_colours):
                 if m < wait:
                     colour = highlight
                     break
             self._dot(target, colour, m, DOT_RING, dx, dy)
+
+    def _ring_tram_charge(self, target, board, charge, dx, dy):
+        """Right half: next trams over 30 minutes. Left half: a 0-100% gauge
+        filling upwards from 6 o'clock."""
+        self._ring_next_tram(target, board, dx, dy, span=30)
+        lit = int(round((charge or 0) / 100.0 * 30)) if charge is not None else 0
+        for k in range(30):
+            colour = self.charge_colour if k < lit else self.colour
+            self._dot(target, colour, 30 + k, DOT_RING, dx, dy)
 
     # -- frame -------------------------------------------------------------
 
@@ -298,6 +310,8 @@ class Renderer:
             self._ring_clock(surf, now, dx, dy)
         elif ring == "next_tram":
             self._ring_next_tram(surf, board, dx, dy)
+        elif ring == "tram_charge":
+            self._ring_tram_charge(surf, board, state.get("charge"), dx, dy)
 
         return surf
 

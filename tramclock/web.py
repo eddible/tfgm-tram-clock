@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 
 STATIC = os.path.join(os.path.dirname(__file__), "static")
 KEY_MASK = "•" * 8
+SECRETS = ("api_key", "ha_token")
 
 
 def make_handler(controller, screen, log_buffer):
@@ -21,8 +22,8 @@ def make_handler(controller, screen, log_buffer):
 
     def public_config():
         cfg = config.get()
-        key = cfg["api_key"]
-        cfg["api_key"] = KEY_MASK + key[-4:] if key else ""
+        for name in SECRETS:
+            cfg[name] = KEY_MASK + cfg[name][-4:] if cfg[name] else ""
         return cfg
 
     class Handler(BaseHTTPRequestHandler):
@@ -93,8 +94,9 @@ def make_handler(controller, screen, log_buffer):
                 controller.set_view(int(body.get("index", 0)))
                 controller.wake()
             elif path == "/api/config":
-                if str(body.get("api_key", "")).startswith(KEY_MASK):
-                    body.pop("api_key")  # unchanged
+                for name in SECRETS:
+                    if str(body.get(name, "")).startswith(KEY_MASK):
+                        body.pop(name)  # unchanged
                 try:
                     config.update(body)
                 except ConfigError as e:

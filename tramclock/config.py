@@ -19,13 +19,19 @@ DEFAULTS = {
     "colour": "#FFB000",
     "show_messages": True,
     # Outer ring: "clock" (analogue time), "next_tram" (minutes to the next
-    # departure) or "off".
+    # departures), "tram_charge" (next trams on the right half, a Home
+    # Assistant percentage such as car charge on the left) or "off".
     "ring": "clock",
     # Next-tram ring: how many trams it shows (1-3) and a colour for each.
     # Stick to colours whose red, green and blue are each fully on or off:
     # the panel bands on part-lit pixels.
     "ring_trams": 1,
     "ring_colours": ["#FFFFFF", "#00FFFF", "#00FF00"],
+    "charge_colour": "#00FF00",
+    # Home Assistant sensor for the "tram_charge" ring.
+    "ha_url": "",
+    "ha_token": "",
+    "ha_entity": "",
     # Windows when the screen stays on without a tap, e.g.
     # {"days": [0, 1, 2, 3, 4], "start": "07:30", "end": "08:30"}  (0 = Monday)
     "schedule": [],
@@ -34,7 +40,7 @@ DEFAULTS = {
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 _COLOUR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-RING_MODES = ("clock", "next_tram", "off")
+RING_MODES = ("clock", "next_tram", "tram_charge", "off")
 
 
 class ConfigError(ValueError):
@@ -68,8 +74,13 @@ def validate(cfg):
         if not lo <= out[key] <= hi:
             raise ConfigError("{} must be between {} and {}".format(key, lo, hi))
 
-    if not _COLOUR_RE.match(str(out["colour"])):
-        raise ConfigError("colour must look like #RRGGBB")
+    for key in ("colour", "charge_colour"):
+        if not _COLOUR_RE.match(str(out[key])):
+            raise ConfigError("{} must look like #RRGGBB".format(key))
+    for key in ("ha_url", "ha_token", "ha_entity"):
+        out[key] = str(out[key]).strip()
+    if out["ha_url"] and not re.match(r"^https?://", out["ha_url"]):
+        raise ConfigError("Home Assistant URL must start with http:// or https://")
     colours = [str(c) for c in out["ring_colours"]][:3]
     if len(colours) != 3 or not all(_COLOUR_RE.match(c) for c in colours):
         raise ConfigError("ring_colours must be three colours like #RRGGBB")

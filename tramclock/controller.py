@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 
+from . import homeassistant
 from .tfgm import TfGM, TfGMError
 
 log = logging.getLogger(__name__)
@@ -14,6 +15,9 @@ DEBOUNCE = 0.3       # ignore taps closer together than this
 STALE_AFTER = 300    # seconds before cached departures are flagged as old
 ERROR_RETRY = 15     # seconds between retries after a failed fetch
 MIN_REFETCH = 10     # don't refetch a view more often than this
+CHARGE_REFRESH = 300  # seconds between Home Assistant reads
+CHARGE_STALE = 3600   # stop showing a charge reading older than this
+HA_KEYS = ("ha_url", "ha_token", "ha_entity")
 
 
 def _minutes(hhmm):
@@ -53,6 +57,9 @@ class Controller:
         self.view = 0
         self._boards = {}          # view index -> (Board, fetched_at)
         self.error = None
+        self._charge_now = threading.Event()
+        self.charge = None          # (percent, read_at)
+        self.charge_error = None
         self._touch_down = None
         self._last_tap = 0.0
         config.on_change(self._config_changed)
@@ -61,6 +68,7 @@ class Controller:
 
     def _config_changed(self, cfg):
         with self._lock:
+            old = self._cfg
             key_changed = cfg["api_key"] != self._cfg["api_key"]
             views_changed = cfg["views"] != self._cfg["views"]
             self._cfg = cfg
@@ -71,6 +79,10 @@ class Controller:
                 self.error = None
             if self.view >= len(cfg["views"]):
                 self.view = 0
+            if any(cfg[k] != old[k] for k in HA_KEYS):
+                self.charge = None
+                self.charge_error = None
+        self._charge_now.set()
         self._fetch_now.set()
         self._changed.set()
 
@@ -90,6 +102,7 @@ class Controller:
         if not was_awake:
             log.info("Waking for %d min", minutes)
             self._fetch_now.set()
+            self._charge_now.set()
         self._changed.set()
 
     def sleep(self):
@@ -210,8 +223,42 @@ class Controller:
             self._fetch_now.wait(wait)
             self._fetch_now.clear()
 
+    def charge_fetcher(self, stop):
+        """Thread: read the Home Assistant sensor while it's on screen."""
+        while not stop.is_set():
+            cfg = self._cfg
+            wait = 3600
+            if self.is_awake() and cfg["ring"] == "tram_charge":
+                age = time.time() - self.charge[1] if self.charge else None
+                if age is None or age >= CHARGE_REFRESH:
+                    try:
+                        value = homeassistant.read_percent(cfg["ha_url"], cfg["ha_token"], cfg["ha_entity"])
+                        self.charge = (value, time.time())
+                        self.charge_error = None
+                    except homeassistant.HomeAssistantError as e:
+                        if str(e) != self.charge_error:
+                            log.warning("Charge read failed: %s", e)
+                        self.charge_error = str(e)
+                    except Exception:
+                        log.exception("Unexpected Home Assistant error")
+                        self.charge_error = "Internal error"
+                    self._changed.set()
+                    wait = CHARGE_REFRESH if self.charge_error is None else ERROR_RETRY * 4
+                else:
+                    wait = CHARGE_REFRESH - age
+            self._charge_now.wait(wait)
+            self._charge_now.clear()
+
+    def current_charge(self):
+        """Latest charge percentage, or None if unknown or too old."""
+        reading = self.charge
+        if reading and time.time() - reading[1] < CHARGE_STALE:
+            return reading[0]
+        return None
+
     def poke(self):
-        """Wake both the fetcher and display loop (e.g. on shutdown)."""
+        """Wake the fetchers and display loop (e.g. on shutdown)."""
+        self._charge_now.set()
         self._fetch_now.set()
         self._changed.set()
 
@@ -234,6 +281,7 @@ class Controller:
             "total": total,
             "scheduled": scheduled,
             "ring": self._cfg["ring"],
+            "charge": self.current_charge(),
         }
 
     def status(self):
@@ -251,4 +299,6 @@ class Controller:
             "departures": [d._asdict() for d in board.departures] if board else None,
             "messages": board.messages if board else [],
             "updated": board.updated if board else None,
+            "charge": self.current_charge() if self._cfg["ring"] == "tram_charge" else None,
+            "charge_error": self.charge_error if self._cfg["ring"] == "tram_charge" else None,
         }
