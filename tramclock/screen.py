@@ -163,14 +163,18 @@ class Renderer:
 
     def _fit(self, text, max_width, sizes=(46, 42, 38, 34), colour=None):
         """Render text in the largest size that fits, else truncate."""
+        return self._fit_sized(text, max_width, sizes, colour)[0]
+
+    def _fit_sized(self, text, max_width, sizes=(46, 42, 38, 34), colour=None):
+        """Like _fit, but also returns the font used."""
         for size in sizes:
             surf = self._text(text, size, colour)
             if surf.get_width() <= max_width:
-                return surf
+                return surf, self.dot(size)
         font = self.dot(sizes[-1])
         while len(text) > 1 and font.size(text + "..")[0] > max_width:
             text = text[:-1]
-        return font.render(text.rstrip() + "..", False, colour or self.colour)
+        return font.render(text.rstrip() + "..", False, colour or self.colour), font
 
     def _text(self, text, size, colour=None):
         return self.dot(size).render(text, False, colour or self.colour)
@@ -179,9 +183,10 @@ class Renderer:
         target.blit(surf, (CENTRE - surf.get_width() // 2 + dx, y))
 
     @staticmethod
-    def _carriages(target, x, y, count, colour):
+    def _carriages(target, x, top, height, count, colour):
+        """One bar per carriage, drawn like the letter I: cap height, on the baseline."""
         for i in range(count):
-            pygame.draw.rect(target, colour, (x + i * 9, y, 6, 18))
+            pygame.draw.rect(target, colour, (x + i * 8, top, 5, height))
 
     @staticmethod
     def _ring(target, colour, frac):
@@ -217,9 +222,12 @@ class Renderer:
                 wait_surf = self.dot(46).render(wait, False, self.colour)
                 surf.blit(wait_surf, (440 - wait_surf.get_width() + dx, y))
                 cars = 2 if dep.carriages == "Double" else 1
-                self._carriages(surf, 42 + dx, y + 14, cars, self.colour)
-                dest = self._fit(SHORT_NAMES.get(dep.dest, dep.dest), 440 - wait_surf.get_width() - 24 - 64)
-                surf.blit(dest, (64 + dx, y))
+                # Capitals sit between 1px below the top and the ascent line.
+                row_font = self.dot(46)
+                self._carriages(surf, 40 + dx, y + 1, row_font.get_ascent() - 1, cars, self.colour)
+                dest, font = self._fit_sized(SHORT_NAMES.get(dep.dest, dep.dest), 440 - wait_surf.get_width() - 24 - 66)
+                # Shrunk names share the baseline with the minutes.
+                surf.blit(dest, (66 + dx, y + row_font.get_ascent() - font.get_ascent()))
         else:
             if board is not None:
                 msg = "No trams due"
