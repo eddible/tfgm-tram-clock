@@ -83,7 +83,7 @@ def display_loop(controller, screen, stop):
             remaining = state["remaining"]
             key = (
                 time.strftime("%H:%M", time.localtime(now)), int(now // 120),
-                state["view_name"], board, state["error"], state["stale"], cfg["colour"],
+                state["view_name"], board, state["error"], state["stale"], cfg["colour"], cfg["ring"],
                 None if remaining is None else int(remaining // 10),
             )
             if key != last_key:

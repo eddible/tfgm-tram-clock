@@ -18,6 +18,9 @@ DEFAULTS = {
     "refresh_seconds": 30,
     "colour": "#FFB000",
     "show_messages": True,
+    # Outer ring: "clock" (analogue time), "next_tram" (minutes to the next
+    # departure) or "off".
+    "ring": "clock",
     # Windows when the screen stays on without a tap, e.g.
     # {"days": [0, 1, 2, 3, 4], "start": "07:30", "end": "08:30"}  (0 = Monday)
     "schedule": [],
@@ -26,6 +29,7 @@ DEFAULTS = {
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 _COLOUR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+RING_MODES = ("clock", "next_tram", "off")
 
 
 class ConfigError(ValueError):
@@ -61,6 +65,8 @@ def validate(cfg):
     if not _COLOUR_RE.match(str(out["colour"])):
         raise ConfigError("colour must look like #RRGGBB")
     out["show_messages"] = bool(out["show_messages"])
+    if out["ring"] not in RING_MODES:
+        raise ConfigError("ring must be one of: " + ", ".join(RING_MODES))
 
     schedule = []
     for w in out["schedule"]:

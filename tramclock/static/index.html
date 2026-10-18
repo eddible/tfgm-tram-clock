@@ -134,6 +134,12 @@
           <input type="number" id="refresh_seconds" min="10" max="600">
         </div>
       </div>
+      <label for="ring">Outer ring</label>
+      <select id="ring">
+        <option value="clock">Clock: hour dot and minutes filling round</option>
+        <option value="next_tram">Next tram: one dot per minute until it's due</option>
+        <option value="off">Off</option>
+      </select>
       <label for="colour">Text colour</label>
       <input type="color" id="colour">
       <label class="switch"><input type="checkbox" id="show_messages"> Scroll service messages along the bottom</label>
@@ -284,13 +290,13 @@ function renderSchedule() {
 }
 
 function fillForm() {
-  for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key"]) $(k).value = cfg[k];
+  for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key", "ring"]) $(k).value = cfg[k];
   $("show_messages").checked = cfg.show_messages;
   renderViews();
   renderSchedule();
 }
 
-for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key", "show_messages"])
+for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key", "show_messages", "ring"])
   $(k).addEventListener("input", markDirty);
 
 $("add-window").onclick = () => {
@@ -305,6 +311,7 @@ $("settings").onsubmit = async (e) => {
     wake_minutes: +$("wake_minutes").value,
     refresh_seconds: +$("refresh_seconds").value,
     colour: $("colour").value,
+    ring: $("ring").value,
     show_messages: $("show_messages").checked,
     api_key: $("api_key").value,
   };

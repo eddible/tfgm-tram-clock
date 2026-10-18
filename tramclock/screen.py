@@ -31,7 +31,11 @@ ORBIT_SECONDS = 120
 # The panel shows banding on anything that isn't a fully-lit pixel, so draw
 # everything in exactly one colour with no anti-aliasing or dimming.
 ERROR_COLOUR = (255, 0, 0)
-RING_DOTS, RING_RADIUS, RING_DOT_SIZE = 96, 231, 3
+# The ring is 60 dot positions, one per minute. Dots are told apart by size,
+# not brightness. Dots rather than a line: a thin circle without
+# anti-aliasing looks jagged, and dots match the dot-matrix font.
+RING_RADIUS = 231
+DOT_SMALL, DOT_MARK, DOT_LEAD, DOT_HOUR = 2, 4, 3, 7
 
 TICKER_TOP, TICKER_HEIGHT = 338, 40
 TICKER_STEP = 2  # px per frame; at 30 fps that's 60 px/s
@@ -189,17 +193,30 @@ class Renderer:
             pygame.draw.rect(target, colour, (x + i * 8, top, 5, height))
 
     @staticmethod
-    def _ring(target, colour, frac):
-        """Countdown as a ring of dots from 12 o'clock clockwise.
+    def _dot(target, colour, minute, size, dx, dy):
+        """Dot at `minute` (0-60, may be fractional) clockwise from 12 o'clock."""
+        a = 2 * math.pi * minute / 60.0
+        centre = (round(CENTRE + dx + RING_RADIUS * math.sin(a)), round(CENTRE + dy - RING_RADIUS * math.cos(a)))
+        pygame.draw.circle(target, colour, centre, size)
 
-        Dots rather than a solid line: without anti-aliasing a thin circle
-        looks jagged, and dots match the dot-matrix font.
-        """
-        lit = int(math.ceil(frac * RING_DOTS))
-        for i in range(lit):
-            a = 2 * math.pi * i / RING_DOTS
-            centre = (round(CENTRE + RING_RADIUS * math.sin(a)), round(CENTRE - RING_RADIUS * math.cos(a)))
-            pygame.draw.circle(target, colour, centre, RING_DOT_SIZE)
+    def _ring_clock(self, target, now, dx, dy):
+        """Analogue clock: hour markers, minutes filling clockwise, a big hour dot."""
+        t = time.localtime(now)
+        for m in range(1, t.tm_min + 1):
+            if m % 5:
+                self._dot(target, self.colour, m, DOT_LEAD if m == t.tm_min else DOT_SMALL, dx, dy)
+        for m in range(0, 60, 5):
+            self._dot(target, self.colour, m, DOT_MARK, dx, dy)
+        hour = (t.tm_hour % 12 + t.tm_min / 60.0) * 5
+        self._dot(target, self.colour, hour, DOT_HOUR, dx, dy)
+
+    def _ring_next_tram(self, target, board, dx, dy):
+        """One big dot per minute until the next tram, over small 5-minute ticks."""
+        wait = board.departures[0].wait if board and board.departures else 0
+        for m in range(0, 60, 5):
+            self._dot(target, self.colour, m, DOT_SMALL, dx, dy)
+        for m in range(min(wait, 60)):
+            self._dot(target, self.colour, m, DOT_MARK, dx, dy)
 
     # -- frame -------------------------------------------------------------
 
@@ -249,10 +266,11 @@ class Renderer:
             label = "screen off in {} min".format(mins) if not state.get("scheduled") else "scheduled"
             self._centred(self._text(label, 24), surf, 398 + dy, dx)
 
-        if state.get("remaining") is not None and state.get("total"):
-            frac = max(0.0, min(1.0, state["remaining"] / float(state["total"])))
-            if frac > 0:
-                self._ring(surf, self.colour, frac)
+        ring = state.get("ring", "clock")
+        if ring == "clock":
+            self._ring_clock(surf, now, dx, dy)
+        elif ring == "next_tram":
+            self._ring_next_tram(surf, board, dx, dy)
 
         return surf
 

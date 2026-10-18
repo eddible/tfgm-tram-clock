@@ -233,6 +233,7 @@ class Controller:
             "remaining": remaining,
             "total": total,
             "scheduled": scheduled,
+            "ring": self._cfg["ring"],
         }
 
     def status(self):
