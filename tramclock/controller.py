@@ -18,7 +18,7 @@ MIN_REFETCH = 10     # don't refetch a view more often than this
 CHARGE_REFRESH = 300  # seconds between Home Assistant reads
 CHARGE_STALE = 3600   # stop showing a charge reading older than this
 HA_KEYS = ("ha_url", "ha_token", "ha_entity")
-SLEEP_COOLDOWN = 120  # ignore "at least" wakes (e.g. motion) this long after a manual sleep
+SLEEP_COOLDOWN = 120  # ignore "at least" wakes (e.g. motion) this long after a long-press sleep
 
 
 def _minutes(hhmm):
@@ -98,7 +98,7 @@ class Controller:
         """Turn the screen on for `minutes`.
 
         With at_least (used for motion sensors), never shorten a longer wake
-        already in progress, and don't undo a manual sleep from just now.
+        already in progress, and don't undo a long-press sleep from just now.
         """
         minutes = minutes or self._cfg["wake_minutes"]
         now = time.time()
@@ -118,11 +118,13 @@ class Controller:
             self._charge_now.set()
         self._changed.set()
 
-    def sleep(self):
+    def sleep(self, cooldown=False):
+        """Turn the screen off. cooldown: briefly ignore motion wakes, for when
+        the person is standing in front of the clock (long press)."""
         now = time.time()
         with self._lock:
             self.awake_until = 0.0
-            self._slept_at = now
+            self._slept_at = now if cooldown else 0.0
             end = schedule_end(self._cfg["schedule"], now)
             self.snoozed_until = end or 0.0
         log.info("Sleeping")
@@ -181,7 +183,7 @@ class Controller:
         if pressed is None or pressed < 0:
             return
         if now - pressed >= LONG_PRESS:
-            self.sleep()
+            self.sleep(cooldown=True)
         elif now - self._last_tap >= DEBOUNCE:
             self._last_tap = now
             if len(self._cfg["views"]) > 1:
