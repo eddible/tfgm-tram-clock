@@ -36,8 +36,10 @@ ERROR_COLOUR = (255, 0, 0)
 # anti-aliasing looks jagged, and dots match the dot-matrix font.
 RING_RADIUS = 231
 DOT_SMALL, DOT_MARK, DOT_LEAD = 2, 3, 3
-# The hour hand is a stubby rounded bar pointing in from the ring.
-HAND_OUTER, HAND_INNER, HAND_WIDTH = 236, 212, 5
+# The hour hand is a short rounded bar pointing in from the ring, with the
+# ring dots either side of it left out so it reads cleanly.
+HAND_OUTER, HAND_INNER, HAND_WIDTH = 234, 216, 3
+HAND_CLEARANCE = 1.2  # in minute positions
 
 TICKER_TOP, TICKER_HEIGHT = 338, 40
 TICKER_STEP = 2  # px per frame; at 30 fps that's 60 px/s
@@ -210,12 +212,19 @@ class Renderer:
     def _ring_clock(self, target, now, dx, dy):
         """Analogue clock: hour markers, minutes filling clockwise, an hour hand."""
         t = time.localtime(now)
+        hand = (t.tm_hour % 12 + t.tm_min / 60.0) * 5
+
+        def clear_of_hand(m):
+            gap = abs(m - hand) % 60
+            return min(gap, 60 - gap) > HAND_CLEARANCE
+
         for m in range(1, t.tm_min + 1):
-            if m % 5:
+            if m % 5 and clear_of_hand(m):
                 self._dot(target, self.colour, m, DOT_LEAD if m == t.tm_min else DOT_SMALL, dx, dy)
         for m in range(0, 60, 5):
-            self._dot(target, self.colour, m, DOT_MARK, dx, dy)
-        self._hand(target, (t.tm_hour % 12 + t.tm_min / 60.0) * 5, dx, dy)
+            if clear_of_hand(m):
+                self._dot(target, self.colour, m, DOT_MARK, dx, dy)
+        self._hand(target, hand, dx, dy)
 
     def _ring_next_tram(self, target, board, dx, dy):
         """One big dot per minute until the next tram, over small 5-minute ticks."""
@@ -234,7 +243,7 @@ class Renderer:
         surf = pygame.Surface((SIZE, SIZE))
         surf.fill((0, 0, 0))
         clock = self._text(time.strftime("%H:%M", time.localtime(now)), 40)
-        self._centred(clock, surf, 34 + dy, dx)
+        self._centred(clock, surf, 32 + dy, dx)
         self._centred(self._fit(state["view_name"].upper(), 340, (30, 26, 22)), surf, 80 + dy, dx)
         pygame.draw.line(surf, self.colour, (70 + dx, 122 + dy), (410 + dx, 122 + dy), 2)
 
