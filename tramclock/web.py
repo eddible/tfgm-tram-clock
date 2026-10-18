@@ -87,7 +87,7 @@ def make_handler(controller, screen, log_buffer):
                 return self._send(400, {"error": "Invalid JSON"})
 
             if path == "/api/wake":
-                controller.wake(body.get("minutes"))
+                controller.wake(body.get("minutes"), at_least=bool(body.get("at_least")))
             elif path == "/api/sleep":
                 controller.sleep()
             elif path == "/api/view":

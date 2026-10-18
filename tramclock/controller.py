@@ -18,6 +18,7 @@ MIN_REFETCH = 10     # don't refetch a view more often than this
 CHARGE_REFRESH = 300  # seconds between Home Assistant reads
 CHARGE_STALE = 3600   # stop showing a charge reading older than this
 HA_KEYS = ("ha_url", "ha_token", "ha_entity")
+SLEEP_COOLDOWN = 120  # ignore "at least" wakes (e.g. motion) this long after a manual sleep
 
 
 def _minutes(hhmm):
@@ -62,6 +63,7 @@ class Controller:
         self.charge_error = None
         self._touch_down = None
         self._last_tap = 0.0
+        self._slept_at = 0.0
         config.on_change(self._config_changed)
 
     # -- config ------------------------------------------------------------
@@ -92,15 +94,26 @@ class Controller:
 
     # -- wake / sleep ------------------------------------------------------
 
-    def wake(self, minutes=None):
+    def wake(self, minutes=None, at_least=False):
+        """Turn the screen on for `minutes`.
+
+        With at_least (used for motion sensors), never shorten a longer wake
+        already in progress, and don't undo a manual sleep from just now.
+        """
         minutes = minutes or self._cfg["wake_minutes"]
+        now = time.time()
         with self._lock:
-            was_awake = self._awake_locked(time.time())
+            was_awake = self._awake_locked(now)
+            if at_least:
+                if now - self._slept_at < SLEEP_COOLDOWN:
+                    return
+                if self.awake_until >= now + minutes * 60.0:
+                    return
             self.awake_total = minutes * 60.0
-            self.awake_until = time.time() + self.awake_total
+            self.awake_until = now + self.awake_total
             self.snoozed_until = 0.0
         if not was_awake:
-            log.info("Waking for %d min", minutes)
+            log.info("Waking for %g min%s", minutes, " (at least)" if at_least else "")
             self._fetch_now.set()
             self._charge_now.set()
         self._changed.set()
@@ -109,6 +122,7 @@ class Controller:
         now = time.time()
         with self._lock:
             self.awake_until = 0.0
+            self._slept_at = now
             end = schedule_end(self._cfg["schedule"], now)
             self.snoozed_until = end or 0.0
         log.info("Sleeping")
