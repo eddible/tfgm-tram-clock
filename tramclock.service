@@ -1,0 +1,16 @@
+[Unit]
+Description=Tram clock (TfGM departures on HyperPixel display)
+After=network-online.target hyperpixel2r-init.service
+Wants=network-online.target
+
+[Service]
+# Root is needed for the framebuffer, backlight, GPIO, I2C touch, the
+# console mode switch and port 80.
+ExecStart=/usr/bin/python3 -m tramclock --config /home/pi/tram-clock/config.json
+WorkingDirectory=/home/pi/tram-clock
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

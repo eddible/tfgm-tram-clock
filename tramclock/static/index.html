@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111111">
+<title>Tram Clock</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --text: #1c1b19; --muted: #6d6a64; --line: #e3e0da;
+    --accent: #d98a00; --accent-text: #ffffff; --danger: #c0392b; --ok: #2e8b57; --field: #faf9f7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121212; --card: #1d1c1a; --text: #f1eee8; --muted: #a29d94; --line: #2f2d2a;
+      --accent: #ffb000; --accent-text: #1a1200; --danger: #ff6b5b; --ok: #5fd08f; --field: #161514;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 16px 16px 48px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 16px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600;
+       text-transform: uppercase; letter-spacing: 0.06em; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+          padding: 16px; margin-bottom: 14px; }
+  .pill { font-size: 14px; padding: 4px 10px; border-radius: 999px; background: var(--line); color: var(--muted); white-space: nowrap; }
+  .pill.on { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+  .preview { display: flex; justify-content: center; margin: 4px 0 16px; }
+  .preview img { width: min(260px, 70vw); aspect-ratio: 1; border-radius: 50%; background: #000;
+                 border: 6px solid #2a2a2a; transition: opacity .3s, filter .3s; }
+  .preview img.off { opacity: .35; filter: grayscale(1); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button, select, input { font: inherit; color: inherit; }
+  button { border: 1px solid var(--line); background: var(--field); border-radius: 10px;
+           padding: 10px 14px; cursor: pointer; min-height: 44px; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 600; }
+  button.ghost { background: none; border-color: transparent; color: var(--muted); padding: 6px 8px; min-height: 36px; }
+  button.danger { color: var(--danger); }
+  button:disabled { opacity: .5; cursor: default; }
+  .grow { flex: 1; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .seg button { flex: 1 1 auto; }
+  .seg button.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  td.wait { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .cars { color: var(--muted); font-size: 13px; margin-left: 6px; }
+  .msg { font-size: 14px; color: var(--muted); margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .muted { color: var(--muted); font-size: 14px; }
+  .error { color: var(--danger); font-size: 14px; }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 4px; }
+  input[type=text], input[type=number], input[type=password], input[type=time], input[type=search], select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); min-height: 44px; }
+  input[type=color] { width: 56px; height: 44px; padding: 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .item { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .item-head { display: flex; align-items: center; gap: 6px; }
+  .item-head input { flex: 1; }
+  .pids { font-size: 13px; color: var(--muted); margin-top: 6px; word-break: break-all; }
+  .days { display: flex; gap: 4px; margin-top: 8px; }
+  .days button { flex: 1; min-height: 36px; padding: 4px 0; font-size: 13px; }
+  .days button.active { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+  .results { max-height: 320px; overflow-y: auto; margin-top: 8px; }
+  .station { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .station b { display: block; margin-bottom: 4px; }
+  .plat { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; font-size: 14px; }
+  .plat input { margin-top: 3px; width: 20px; height: 20px; }
+  .switch { display: flex; align-items: center; gap: 10px; margin-top: 14px; color: var(--text); font-size: 15px; }
+  .switch input { width: 20px; height: 20px; }
+  .savebar { position: sticky; bottom: 12px; display: flex; gap: 10px; align-items: center; justify-content: flex-end;
+             background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-top: 8px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  pre { font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow: auto; color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Tram Clock</h1>
+    <span id="pill" class="pill">…</span>
+  </header>
+
+  <section class="card">
+    <div class="preview"><img id="shot" alt="What the clock is showing" src="/screen.png"></div>
+    <div class="row">
+      <select id="duration" class="grow" aria-label="How long to stay on">
+        <option value="5">5 minutes</option>
+        <option value="15">15 minutes</option>
+        <option value="30" selected>30 minutes</option>
+        <option value="60">1 hour</option>
+        <option value="120">2 hours</option>
+      </select>
+      <button id="wake" class="primary">Turn on</button>
+      <button id="sleep">Turn off</button>
+    </div>
+    <div id="views" class="seg"></div>
+  </section>
+
+  <section class="card">
+    <h2 id="board-title">Departures</h2>
+    <div id="board"><p class="muted">Loading…</p></div>
+  </section>
+
+  <form id="settings" autocomplete="off">
+    <section class="card">
+      <h2>Stops</h2>
+      <p class="muted" style="margin-top:-6px">Tapping the clock cycles through these.</p>
+      <div id="view-list"></div>
+      <button type="button" id="add-stop">+ Add a stop</button>
+      <div id="picker" hidden>
+        <label for="search">Search for a station</label>
+        <input type="search" id="search" placeholder="e.g. Timperley">
+        <div id="results" class="results"></div>
+        <div class="row" style="margin-top:8px">
+          <button type="button" class="ghost" id="picker-cancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Screen</h2>
+      <div class="grid2">
+        <div>
+          <label for="wake_minutes">Stay on after a tap (min)</label>
+          <input type="number" id="wake_minutes" min="1" max="1440">
+        </div>
+        <div>
+          <label for="refresh_seconds">Refresh every (sec)</label>
+          <input type="number" id="refresh_seconds" min="10" max="600">
+        </div>
+      </div>
+      <label for="colour">Text colour</label>
+      <input type="color" id="colour">
+      <label class="switch"><input type="checkbox" id="show_messages"> Scroll service messages along the bottom</label>
+    </section>
+
+    <section class="card">
+      <h2>Schedule</h2>
+      <p class="muted" style="margin-top:-6px">Times when the screen comes on by itself, like your morning commute.</p>
+      <div id="schedule-list"></div>
+      <button type="button" id="add-window">+ Add a time</button>
+    </section>
+
+    <section class="card">
+      <h2>TfGM API</h2>
+      <label for="api_key">Subscription key</label>
+      <input type="password" id="api_key" placeholder="From developer.tfgm.com">
+      <details style="margin-top:14px">
+        <summary>Recent log</summary>
+        <pre id="log"></pre>
+      </details>
+    </section>
+
+    <div class="savebar">
+      <span id="save-status" class="muted grow"></span>
+      <button type="submit" class="primary" id="save" disabled>Save changes</button>
+    </div>
+  </form>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+let cfg = null, status = null, platforms = null, dirty = false;
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+  };
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+  return data;
+}
+
+function el(tag, props = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "class") e.className = v;
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of children.flat()) if (c != null) e.append(c);
+  return e;
+}
+
+// ---- status ---------------------------------------------------------------
+
+function renderStatus() {
+  const s = status, pill = $("pill");
+  if (s.awake) {
+    const mins = Math.ceil((s.remaining || 0) / 60);
+    pill.textContent = s.scheduled ? "On · scheduled" : `On · ${mins} min left`;
+    pill.className = "pill on";
+  } else {
+    pill.textContent = "Off";
+    pill.className = "pill";
+  }
+  $("shot").classList.toggle("off", !s.awake);
+
+  const views = $("views");
+  views.replaceChildren(...s.views.map((name, i) =>
+    el("button", {class: i === s.view ? "active" : "", onclick: () => act("/api/view", {index: i})}, name)));
+  views.hidden = s.views.length < 2;
+
+  $("board-title").textContent = s.views[s.view] || "Departures";
+  const board = $("board");
+  if (!s.views.length) {
+    board.replaceChildren(el("p", {class: "muted"}, "Add a stop below to get started."));
+    return;
+  }
+  const parts = [];
+  if (s.departures && s.departures.length) {
+    parts.push(el("table", {}, s.departures.map(d => el("tr", {},
+      el("td", {}, d.dest, el("span", {class: "cars"}, d.carriages === "Double" ? "double" : "")),
+      el("td", {class: "wait"}, d.wait === 0 ? "Now" : `${d.wait} min`)))));
+  } else if (s.departures) {
+    parts.push(el("p", {class: "muted"}, "No trams due."));
+  } else if (!s.error) {
+    parts.push(el("p", {class: "muted"}, s.awake ? "Loading…" : "Turn the screen on to fetch times."));
+  }
+  if (s.error) parts.push(el("p", {class: "error"}, s.error));
+  if (s.age != null && s.departures) parts.push(el("p", {class: "muted"}, `Updated ${Math.round(s.age)}s ago`));
+  for (const m of s.messages || []) parts.push(el("div", {class: "msg"}, m));
+  board.replaceChildren(...parts);
+}
+
+async function refresh() {
+  try {
+    status = await api("/api/status");
+    renderStatus();
+    $("shot").src = "/screen.png?t=" + Date.now();
+  } catch (e) {
+    $("pill").textContent = "Offline";
+    $("pill").className = "pill";
+  }
+}
+
+async function act(path, body = {}) {
+  try { status = await api(path, body); renderStatus(); } catch (e) { alert(e.message); }
+  setTimeout(refresh, 600);
+}
+
+$("wake").onclick = () => act("/api/wake", {minutes: +$("duration").value});
+$("sleep").onclick = () => act("/api/sleep");
+
+// ---- settings -------------------------------------------------------------
+
+function markDirty() { dirty = true; $("save").disabled = false; $("save-status").textContent = "Unsaved changes"; }
+
+function renderViews() {
+  $("view-list").replaceChildren(...cfg.views.map((v, i) => el("div", {class: "item"},
+    el("div", {class: "item-head"},
+      el("input", {type: "text", value: v.name, "aria-label": "Stop name", maxlength: 40,
+                   oninput: e => { v.name = e.target.value; markDirty(); }}),
+      el("button", {type: "button", class: "ghost", title: "Move up", disabled: i === 0,
+                    onclick: () => { cfg.views.splice(i - 1, 0, cfg.views.splice(i, 1)[0]); renderViews(); markDirty(); }}, "↑"),
+      el("button", {type: "button", class: "ghost danger", title: "Remove",
+                    onclick: () => { cfg.views.splice(i, 1); renderViews(); markDirty(); }}, "✕")),
+    el("div", {class: "pids"}, "Platforms: " + v.pids.join(", ")))));
+}
+
+function renderSchedule() {
+  $("schedule-list").replaceChildren(...cfg.schedule.map((w, i) => el("div", {class: "item"},
+    el("div", {class: "item-head"},
+      el("input", {type: "time", value: w.start, "aria-label": "From",
+                   oninput: e => { w.start = e.target.value; markDirty(); }}),
+      el("span", {class: "muted"}, "to"),
+      el("input", {type: "time", value: w.end, "aria-label": "Until",
+                   oninput: e => { w.end = e.target.value; markDirty(); }}),
+      el("button", {type: "button", class: "ghost danger", title: "Remove",
+                    onclick: () => { cfg.schedule.splice(i, 1); renderSchedule(); markDirty(); }}, "✕")),
+    el("div", {class: "days"}, DAYS.map((d, di) => el("button", {
+      type: "button", class: w.days.includes(di) ? "active" : "", "aria-pressed": w.days.includes(di) ? "true" : "false",
+      onclick: () => {
+        w.days = w.days.includes(di) ? w.days.filter(x => x !== di) : [...w.days, di].sort();
+        renderSchedule(); markDirty();
+      }}, d))))));
+}
+
+function fillForm() {
+  for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key"]) $(k).value = cfg[k];
+  $("show_messages").checked = cfg.show_messages;
+  renderViews();
+  renderSchedule();
+}
+
+for (const k of ["wake_minutes", "refresh_seconds", "colour", "api_key", "show_messages"])
+  $(k).addEventListener("input", markDirty);
+
+$("add-window").onclick = () => {
+  cfg.schedule.push({days: [0, 1, 2, 3, 4], start: "07:30", end: "08:30"});
+  renderSchedule(); markDirty();
+};
+
+$("settings").onsubmit = async (e) => {
+  e.preventDefault();
+  const body = {
+    ...cfg,
+    wake_minutes: +$("wake_minutes").value,
+    refresh_seconds: +$("refresh_seconds").value,
+    colour: $("colour").value,
+    show_messages: $("show_messages").checked,
+    api_key: $("api_key").value,
+  };
+  $("save").disabled = true;
+  $("save-status").textContent = "Saving…";
+  try {
+    cfg = await api("/api/config", body);
+    fillForm();
+    dirty = false;
+    $("save-status").textContent = "Saved";
+    platforms = null;  // key may have changed
+    refresh();
+  } catch (err) {
+    $("save").disabled = false;
+    $("save-status").innerHTML = "";
+    $("save-status").append(el("span", {class: "error"}, err.message));
+  }
+};
+
+// ---- stop picker ----------------------------------------------------------
+
+$("add-stop").onclick = async () => {
+  $("picker").hidden = false;
+  $("add-stop").hidden = true;
+  $("search").focus();
+  if (!platforms) {
+    $("results").replaceChildren(el("p", {class: "muted"}, "Loading stations…"));
+    try { platforms = await api("/api/platforms"); }
+    catch (e) { $("results").replaceChildren(el("p", {class: "error"}, e.message)); return; }
+  }
+  renderResults();
+};
+
+$("picker-cancel").onclick = () => { $("picker").hidden = true; $("add-stop").hidden = false; };
+$("search").oninput = () => renderResults();
+
+function renderResults() {
+  if (!platforms) return;
+  const q = $("search").value.trim().toLowerCase();
+  if (q.length < 2) { $("results").replaceChildren(el("p", {class: "muted"}, "Type at least 2 letters.")); return; }
+  const byStation = new Map();
+  for (const p of platforms)
+    if (p.station.toLowerCase().includes(q)) {
+      if (!byStation.has(p.station)) byStation.set(p.station, []);
+      byStation.get(p.station).push(p);
+    }
+  if (!byStation.size) { $("results").replaceChildren(el("p", {class: "muted"}, "No matching stations.")); return; }
+
+  $("results").replaceChildren(...[...byStation].slice(0, 12).map(([station, plats]) => {
+    const boxes = [];
+    // Group platforms by direction so the obvious choice is one tap.
+    const dirs = [...new Set(plats.map(p => p.direction))];
+    return el("div", {class: "station"},
+      el("b", {}, station),
+      plats.map(p => {
+        const box = el("input", {type: "checkbox", value: p.pid});
+        boxes.push(box);
+        return el("label", {class: "plat"}, box,
+          el("span", {}, `${p.direction || "Platform"} · ${p.pid}`,
+            el("br"), el("span", {class: "muted"}, p.dests.length ? "to " + p.dests.join(", ") : "no trams listed")));
+      }),
+      el("div", {class: "row"},
+        dirs.map(dir => el("button", {type: "button", onclick: () => addView(station, dir, plats.filter(p => p.direction === dir))},
+          `Add ${dir || "all"}`)),
+        el("button", {type: "button", class: "ghost", onclick: () => {
+          const chosen = plats.filter((p, i) => boxes[i].checked);
+          if (chosen.length) addView(station, null, chosen);
+        }}, "Add ticked")));
+  }));
+}
+
+function addView(station, direction, plats) {
+  const label = direction === "Incoming" ? "to city" : direction === "Outgoing" ? "out of city" : direction;
+  cfg.views.push({name: (station + (label ? " " + label : "")).slice(0, 40), pids: plats.map(p => p.pid)});
+  renderViews(); markDirty();
+  $("picker").hidden = true; $("add-stop").hidden = false; $("search").value = "";
+}
+
+// ---- boot -----------------------------------------------------------------
+
+async function loadLog() { try { $("log").textContent = (await api("/api/log")).slice(-80).join("\n"); } catch (e) {} }
+document.querySelector("details").addEventListener("toggle", loadLog);
+
+(async () => {
+  try { cfg = await api("/api/config"); fillForm(); } catch (e) { $("save-status").textContent = e.message; }
+  await refresh();
+  setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+})();
+window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+</script>
+</body>
+</html>
