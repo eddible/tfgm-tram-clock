@@ -184,7 +184,7 @@ class Renderer:
 
     @staticmethod
     def _carriages(target, x, top, height, count, colour):
-        """One bar per carriage, drawn like the letter I: cap height, on the baseline."""
+        """One bar per carriage, sitting on the baseline."""
         for i in range(count):
             pygame.draw.rect(target, colour, (x + i * 8, top, 5, height))
 
@@ -222,9 +222,10 @@ class Renderer:
                 wait_surf = self.dot(46).render(wait, False, self.colour)
                 surf.blit(wait_surf, (440 - wait_surf.get_width() + dx, y))
                 cars = 2 if dep.carriages == "Double" else 1
-                # Capitals sit between 1px below the top and the ascent line.
+                # Bars span the x-height: from the top of lowercase letters to the baseline.
                 row_font = self.dot(46)
-                self._carriages(surf, 40 + dx, y + 1, row_font.get_ascent() - 1, cars, self.colour)
+                x_top = row_font.render("x", False, self.colour).get_bounding_rect().top
+                self._carriages(surf, 40 + dx, y + x_top, row_font.get_ascent() - x_top, cars, self.colour)
                 dest, font = self._fit_sized(SHORT_NAMES.get(dep.dest, dep.dest), 440 - wait_surf.get_width() - 24 - 66)
                 # Shrunk names share the baseline with the minutes.
                 surf.blit(dest, (66 + dx, y + row_font.get_ascent() - font.get_ascent()))
