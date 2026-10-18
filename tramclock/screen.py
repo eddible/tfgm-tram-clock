@@ -31,7 +31,7 @@ SECONDARY = 0.85
 
 TICKER_TOP, TICKER_HEIGHT = 338, 40
 TICKER_SPEED = 60  # px per second
-TICKER_LEFT, TICKER_RIGHT = 52, 428  # visible chord of the circle at ticker height
+TICKER_LEFT, TICKER_RIGHT = 60, 420  # visible chord of the circle at ticker height
 
 # Shorter names so destinations fit at a readable size.
 SHORT_NAMES = {
@@ -250,16 +250,16 @@ class Renderer:
     def has_ticker(self):
         return self._ticker_surface is not None
 
-    def ticker(self, now):
-        """The ticker band (480 x TICKER_HEIGHT) at time `now`."""
-        band = pygame.Surface((SIZE, TICKER_HEIGHT))
-        band.fill((0, 0, 0))
-        if self._ticker_surface:
-            band.set_clip(pygame.Rect(TICKER_LEFT, 0, TICKER_RIGHT - TICKER_LEFT, TICKER_HEIGHT))
-            lap = self._ticker_surface.get_width() + TICKER_RIGHT - TICKER_LEFT
-            x = TICKER_RIGHT - int(now * TICKER_SPEED) % lap
-            band.blit(self._ticker_surface, (x, (TICKER_HEIGHT - self._ticker_surface.get_height()) // 2))
-        return band
+    def draw_ticker(self, target, now):
+        """Draw the ticker onto target at time `now`, touching only its own strip."""
+        if not self._ticker_surface:
+            return
+        target.set_clip(pygame.Rect(TICKER_LEFT, TICKER_TOP, TICKER_RIGHT - TICKER_LEFT, TICKER_HEIGHT))
+        target.fill((0, 0, 0))
+        lap = self._ticker_surface.get_width() + TICKER_RIGHT - TICKER_LEFT
+        x = TICKER_RIGHT - int(now * TICKER_SPEED) % lap
+        target.blit(self._ticker_surface, (x, TICKER_TOP + (TICKER_HEIGHT - self._ticker_surface.get_height()) // 2))
+        target.set_clip(None)
 
 
 class Screen:
@@ -274,17 +274,16 @@ class Screen:
 
     def draw(self, state, now):
         surf = self.renderer.frame(state, now)
-        if self.renderer.has_ticker:
-            surf.blit(self.renderer.ticker(now), (0, TICKER_TOP))
+        self.renderer.draw_ticker(surf, now)
         with self._lock:
             self._frame = surf
         if self.panel:
             self.panel.show(surf)
 
     def draw_ticker(self, now):
-        band = self.renderer.ticker(now)
         with self._lock:
-            self._frame.blit(band, (0, TICKER_TOP))
+            self.renderer.draw_ticker(self._frame, now)
+            band = self._frame.subsurface((0, TICKER_TOP, SIZE, TICKER_HEIGHT)).copy()
         if self.panel:
             self.panel.show(band, TICKER_TOP)
 
