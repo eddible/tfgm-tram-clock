@@ -272,6 +272,13 @@ class Controller:
             return reading[0]
         return None
 
+    def screen_turned_on(self):
+        """Called by the display loop whenever the screen goes from off to on,
+        whatever the cause (tap, motion, web UI or a schedule window), so the
+        fetchers don't sit out their idle wait."""
+        self._fetch_now.set()
+        self._charge_now.set()
+
     def poke(self):
         """Wake the fetchers and display loop (e.g. on shutdown)."""
         self._charge_now.set()

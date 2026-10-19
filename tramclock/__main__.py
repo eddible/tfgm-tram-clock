@@ -68,7 +68,9 @@ def display_loop(controller, screen, stop):
         if is_awake != awake:
             awake = is_awake
             last_key = None
-            if not awake:
+            if awake:
+                controller.screen_turned_on()
+            else:
                 screen.blank()
                 screen.set_backlight(False)
 
