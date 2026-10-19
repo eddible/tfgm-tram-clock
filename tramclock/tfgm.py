@@ -58,13 +58,16 @@ class TfGM:
             for i in range(4):
                 dest = (row.get("Dest%d" % i) or "").strip()
                 wait = (row.get("Wait%d" % i) or "").strip()
-                if not dest or not wait.isdigit():
+                status = row.get("Status%d" % i) or ""
+                # A departing tram can't be caught, and during closures the
+                # signs leave a phantom "Departing" entry up all day.
+                if not dest or not wait.isdigit() or status == "Departing":
                     continue
                 departures.append(Departure(
                     dest=dest,
                     wait=int(wait),
                     carriages=row.get("Carriages%d" % i) or "",
-                    status=row.get("Status%d" % i) or "",
+                    status=status,
                 ))
             msg = (row.get("MessageBoard") or "").strip()
             if msg and msg not in messages and not msg.startswith("<no message>"):
